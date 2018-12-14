@@ -10,15 +10,15 @@ bool IsOperator(char op)
 	else
 		return false;
 }
-bool IsXYZ(char x)
+bool IsXYZ(char xyz)
 {
-	if (x == 'x' || x == 'y' || x == 'z')
+	if (xyz == 'x' || xyz == 'y' || xyz == 'z')
 		return true;
 	else 
 		return false;
 }
 
-double ConvertCoeff(string _k)
+int ConvertCoeff(string _k)
 {
 	if (_k.empty())
 		return 1;
@@ -30,20 +30,54 @@ double ConvertCoeff(string _k)
 			if (_k[0] == '-')
 				return -1;
 	}
-	return atof(_k.c_str());
+	return atoi(_k.c_str());
 }
+
 class Monom
 {
-	double coeff;
-	int exp; //0-999
+	int coeff;
+	int exp; //0-999 xyz
 public:
-	Monom(double c = 0, int e = 0)
+	Monom(int c = 0, int e = 0,string _monom = "")
 	{
 		coeff = c;
 		exp = e;
 	}
 
-	double GetCoeff()
+	Monom operator+(const Monom &m)
+	{
+		if (exp != m.exp)
+			throw "not equal coeffs";
+		Monom tmp;
+		tmp.coeff = coeff + m.coeff;
+		tmp.exp = exp;
+		return tmp;
+	}
+
+	Monom operator-(const Monom &m)
+	{
+		if (exp != m.exp)
+			throw "not equal coeffs";
+		Monom tmp;
+		tmp.coeff = coeff - m.coeff;
+		tmp.exp = exp;
+		return tmp;
+	}
+
+	bool operator==(const Monom &m)
+	{
+		if (coeff == m.coeff && exp == m.exp)
+			return true;
+		else
+			return false;
+	}
+
+	bool operator!=(const Monom &m)
+	{
+		return !(*this == m);
+	}
+
+	int GetCoeff()
 	{
 		return coeff;
 	}
@@ -53,9 +87,9 @@ public:
 		return exp;
 	}
 
-	bool IsEqualPow(Monom m1, Monom m2)
+	bool IsEqualPow(Monom m)
 	{
-		if (m1.GetExp() == m2.GetExp())
+		if (GetExp() == m.GetExp())
 			return true;
 		else
 			return false;
@@ -79,23 +113,19 @@ class TPolinom
 public:
 	void FillMonoms()
 	{
+		monoms.DelAllNode();
 		vector<string> monoms_str;
 		int i = 0;
 		do
 		{
-			if (IsOperator(polinom[i])) // -1xxx+2yyyy-3z
+			string monom;
+			do
 			{
-				string monom;
-				do
-				{
-					monom += polinom[i];
-					i++;
-				} while (!IsOperator(polinom[i]) && i != polinom.size());  // + or -
-
-				monoms_str.push_back(monom);
-			}
-			else
+				monom += polinom[i];
 				i++;
+			} while (!IsOperator(polinom[i]) && i != polinom.size());  // + or -
+
+			monoms_str.push_back(monom);
 		} while (i < polinom.size());
 
 		for (int i = 0; i < monoms_str.size(); i++)
@@ -115,7 +145,7 @@ public:
 			else
 			{
 				int _exp = 0; //0-999
-				for (j; j < monoms_str[i].size(); j++)          //-2x^2y^3z +2
+				for (j; j < monoms_str[i].size(); j++)          
 				{
 					if (monoms_str[i][j] == 'z')
 					{
@@ -152,7 +182,7 @@ public:
 								else
 								{
 									j = j + 2;
-									_exp += monoms_str[i][j] - '0' * 100; // -48
+									_exp += (int)(monoms_str[i][j] - '0') * 100; // -48
 								}
 							}
 				}
@@ -171,12 +201,111 @@ public:
 
 	TPolinom& operator=(TPolinom& p)
 	{
+		polinom = p.polinom;
+		monoms = p.monoms;
+		return *this;
+	}
 
+	bool operator==(const TPolinom &p)
+	{
+		if (monoms == p.monoms)
+			return true;
+		else
+			return false;
+	}
+
+	bool operator!=(const TPolinom &p)
+	{
+		return !(*this == p);
 	}
 
 	TPolinom operator+(TPolinom& p)
 	{
-		TPolinom tmp;
-		return tmp;
+		TPolinom result, main, side;
+		TList<Monom>::Iterator it1, it2;
+		if (monoms.GetSize() >= p.monoms.GetSize())
+		{
+			main = *this;
+			side = p;
+			it1 = monoms.Begin();
+			it2 = p.monoms.Begin();
+		}
+		else
+		{
+			main = p;
+			side = *this;
+			it2 = monoms.Begin();
+			it1 = p.monoms.Begin();
+		}
+		for (it1; it1 != main.monoms.End();)
+		{
+			if (it1->key.GetExp() == it2->key.GetExp())
+			{
+				if ((it1->key.GetCoeff() + it2->key.GetCoeff()) != 0)
+					result.monoms.AddNodeEnd(*(it1)+*(it2));
+				++it1; ++it2;
+			}
+			else if (it1->key.GetExp() > it2->key.GetExp())
+			{
+				result.monoms.AddNodeEnd(*it1);
+				++it1;
+			}
+			else 
+			{
+				result.monoms.AddNodeEnd(*it2);
+				++it2;
+			}
+		}
+		while (it2 != side.monoms.End())
+		{
+			result.monoms.AddNodeEnd(*it2);
+			++it2;
+		}
+		return result;
 	}
+
+	friend ostream & operator<<(ostream &os, TPolinom &pl);
+	friend istream & operator>>(istream &is, TPolinom &pl);
 };
+
+ostream & operator<<(ostream & os, TPolinom & p)
+{
+	string pl;
+	for (auto it = p.monoms.Begin(); it != p.monoms.End(); ++it)
+	{
+		int deg = it->key.GetExp();
+		if (it != p.monoms.Begin() && it->key.GetCoeff() > 0)
+			os << "+";
+		if (it->key.GetCoeff() != 1)
+			os << to_string(it->key.GetCoeff());
+		if ((int)(deg * 0.01) % 10 != 0)
+		{
+			if ((int)(deg * 0.01) % 10 == 1)
+				os << "x";
+			else
+				os << "x^" << (int)(deg * 0.01) % 10;
+		}
+		if ((int)(deg * 0.1) % 10 != 0)
+		{
+			if ((int)(deg * 0.1) % 10 == 1)
+				os << "y";
+			else
+				os << "y^" << (int)(deg * 0.1) % 10;
+		}
+		if (deg % 10 != 0)
+		{
+			if (deg % 10 == 1)
+				os << "z";
+			else
+				os << "z^" << deg % 10;
+		}
+	}
+	return os;
+}
+
+istream & operator>>(istream & is, TPolinom & p)
+{
+	is >> p.polinom;
+	p.FillMonoms();
+	return is;
+}
